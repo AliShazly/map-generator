@@ -1,6 +1,7 @@
 import math
 import random
 from PIL import Image
+import hashlib
 
 # http://staffwww.itn.liu.se/~stegu/simplexnoise/simplexnoise.pdf
 # https://eev.ee/blog/2016/05/29/perlin-noise/
@@ -8,9 +9,11 @@ from PIL import Image
 
 class Perlin:
 
-    def __init__(self, grid):
+    def __init__(self, grid, seed=None):
         self.grid = grid
         self.seed = list(range(256))
+        if seed:
+            random.seed(seed)
         random.shuffle(self.seed)
         self.gradient_vectors = [(-1.0, 1.0),
                                 (math.sqrt(2), 0.0),
@@ -20,6 +23,7 @@ class Perlin:
                                 (1.0, 1.0),
                                 (0.0 , -math.sqrt(2)),
                                 (-1.0, -1.0)]
+
     def _lerp(self, first, second, by):
         '''Linear interpolation between two points'''
         return (first * by) + (second * (1 - by))
@@ -34,8 +38,10 @@ class Perlin:
 
     def _get_gradient(self, x, y):
         '''Picks a psuedo-random gradient from the gradient table'''
-        hashed = self.seed[hash(str(x) + str(y)) % 256]
-        return self.gradient_vectors[hashed % 8]
+        string = str(x) + str(y)
+        hashed = int(hashlib.sha256(string.encode('utf-8')).hexdigest(), 16) % 256
+        seed = self.seed[hashed]
+        return self.gradient_vectors[seed % 8]
 		
     def perlin_noise(self, x, y):
         '''Calculates perlin noise for a given 2D point. Returns a value between 0 and 1'''
@@ -72,7 +78,7 @@ class Perlin:
 
 def main():
     freq = 200  # Freq, smaller is more dense
-    noise = Perlin(freq)
+    noise = Perlin(freq, seed='gordie')
     noise.create_image(width=600, height=600, out_path='./noise.png')
 
 if __name__ == '__main__':
