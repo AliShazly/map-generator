@@ -1,23 +1,79 @@
-import numpy as np
+import math
+import random
 from PIL import Image
 
-def generate_gradient_table(length):
-    low, high = -1, 1
-    gradient_table = np.zeros(length, dtype=tuple)
-    for i in range(length):
-        vector = (high - low) * np.random.random_sample(2) + low
-        gradient_table[i] = tuple(vector)
-    return gradient_table
+# http://staffwww.itn.liu.se/~stegu/simplexnoise/simplexnoise.pdf
+# https://eev.ee/blog/2016/05/29/perlin-noise/
+# https://en.wikipedia.org/wiki/Perlin_noise
 
-def dot_product(vec1, vec2):
-    return (vec1[0] * vec2[0]) + (vec1[1] * vec2[1])
+class Perlin:
 
-def to_uint8(old_val):
-    old_max, old_min = 1, -1
-    new_max, new_min = 255, 0
-    new_val = (((old_val - old_min) * (new_max - new_min)) / (old_max - old_min)) + new_min
-    return round(new_val)
+    def __init__(self, grid):
+        self.grid = grid
+        self.seed = list(range(256))
+        random.shuffle(self.seed)
+        self.gradient_vectors = [(-1.0, 1.0),
+                                (math.sqrt(2), 0.0),
+                                (1.0, -1.0),
+                                (0.0, math.sqrt(2)),
+                                (-math.sqrt(2), 0.0),
+                                (1.0, 1.0),
+                                (0.0 , -math.sqrt(2)),
+                                (-1.0, -1.0)]
+    def _lerp(self, first, second, by):
+        '''Linear interpolation between two points'''
+        return (first * by) + (second * (1 - by))
 
-def f(t):
-    return 6*t**5 - 15*t**4 + 10*t**3
+    def _f(self, t):
+        '''Blending function'''
+        return ((6 * (t**5)) - (15 * (t**4)) + (10 * (t**3)))
 
+    def _dot(self, vec1, vec2):
+        '''Calculates the dot product of two vectors'''
+        return (vec1[0] * vec2[0]) + (vec1[1] * vec2[1])
+
+    def _get_gradient(self, x, y):
+        '''Picks a psuedo-random gradient from the gradient table'''
+        hashed = self.seed[hash(str(x) + str(y)) % 256]
+        return self.gradient_vectors[hashed % 8]
+		
+    def perlin_noise(self, x, y):
+        '''Calculates perlin noise for a given 2D point. Returns a value between 0 and 1'''
+        blockX = math.floor(x / self.grid)  # Calculates local grid points
+        blockY = math.floor(y / self.grid)
+
+        x = (x % self.grid) / float(self.grid)  # Normalize x and y to these grid points
+        y = (y % self.grid) / float(self.grid)
+
+        grad1 = self._get_gradient(blockX, blockY)
+        grad2 = self._get_gradient(blockX + 1, blockY)
+        grad3 = self._get_gradient(blockX + 1, blockY + 1)
+        grad4 = self._get_gradient(blockX, blockY + 1)
+
+        dot1 = self._dot((x, y), grad1)
+        dot2 = self._dot((x - 1, y), grad2)
+        dot3 = self._dot((x - 1, y - 1), grad3)
+        dot4 = self._dot((x, y - 1), grad4)
+
+        # Interpolate the results, add 1 and divide by 2 to adjust range
+        thresh1 = 1  # 0 - 2
+        thresh2 = 2  # > 2
+        return (self._lerp(self._lerp(dot3, dot4, self._f(x)), self._lerp(dot2, dot1, self._f(x)), self._f(y)) + thresh1) / thresh2
+    
+    def create_image(self, width=500, height=500, out_path='./noise.png'):
+        '''Exports the perlin noise as a greyscale image'''
+        img = Image.new('L', (height, width), 255)
+        data = img.load()
+        for x in range(height):
+            for y in range(width):
+                value = self.perlin_noise(x, y)
+                data[x, y] = math.floor(value * 255)
+        img.save(out_path)
+
+def main():
+    freq = 200  # Freq, smaller is more dense
+    noise = Perlin(freq)
+    noise.create_image(width=600, height=600, out_path='./noise.png')
+
+if __name__ == '__main__':
+    main()
