@@ -1,18 +1,73 @@
 import numpy as np
-import matplotlib.pyplot as plt
 from scipy.spatial import Voronoi
+import sys
+from PIL import Image
+import matplotlib.pyplot as plt
 
-def voronoi_finite_polygons_2d(vor, radius=None):
+class VoronoiDiagram:
 
-    if vor.points.shape[1] != 2:
-        raise ValueError("Requires 2D input")
+    def __init__(self, num_points=100, dimensions = (None, None)):
+        self.points = np.random.random((num_points, 2))
+        self.bounding_region = [min(self.points[:, 0]), max(self.points[:, 0]), min(self.points[:, 1]), max(self.points[:, 1])]
 
+
+    def generate_voronoi(self):
+        # https://stackoverflow.com/questions/28665491/getting-a-bounded-polygon-coordinates-from-voronoi-cells
+        eps = sys.float_info.epsilon
+        self.vor = Voronoi(self.points)
+        self.filtered_regions = []
+        for region in self.vor.regions:
+            flag = True
+            for index in region:
+                if index == -1:
+                    flag = False
+                    break
+                else:
+                    x = self.vor.vertices[index, 0]
+                    y = self.vor.vertices[index, 1]
+                    if not (self.bounding_region[0] - eps <= x and x <= self.bounding_region[1] + eps and
+                            self.bounding_region[2] - eps <= y and y <= self.bounding_region[3] + eps):
+                        flag = False
+                        break
+            if region != [] and flag:
+                self.filtered_regions.append(region)
+        return self.vor
+
+    def _region_centroid(self, vertices):
+        signed_area = 0
+        C_x = 0
+        C_y = 0
+        for i in range(len(vertices)-1):
+            step = (vertices[i, 0]*vertices[i+1, 1])-(vertices[i+1, 0]*vertices[i, 1])
+            signed_area += step
+            C_x += (vertices[i, 0] + vertices[i+1, 0])*step
+            C_y += (vertices[i, 1] + vertices[i+1, 1])*step
+        signed_area = 1/2*signed_area
+        C_x = (1.0/(6.0*signed_area))*C_x
+        C_y = (1.0/(6.0*signed_area))*C_y
+        return np.array([[C_x, C_y]])
+
+    def relax_points(self, iterations=1):
+        # https://stackoverflow.com/questions/17637244/voronoi-and-lloyd-relaxation-using-python-scipy
+        for i in range(iterations):
+            centroids = []
+            for region in self.filtered_regions:
+                vertices = self.vor.vertices[region + [region[0]], :]
+                centroid = self._region_centroid(vertices)
+                centroids.append(list(centroid[0, :]))
+            self.points = centroids
+            self.generate_voronoi()
+        return self.vor
+
+
+def voronoi_finite_polygons_2d(vor):
+    # https://stackoverflow.com/questions/20515554/colorize-voronoi-diagram/20678647#20678647
     new_regions = []
     new_vertices = vor.vertices.tolist()
 
     center = vor.points.mean(axis=0)
-    if radius is None:
-        radius = vor.points.ptp().max()*2
+
+    radius = vor.points.ptp().max()*2
 
     # Construct a map containing all ridges for a given point
     all_ridges = {}
@@ -63,36 +118,3 @@ def voronoi_finite_polygons_2d(vor, radius=None):
         new_regions.append(new_region.tolist())
 
     return new_regions, np.asarray(new_vertices)
-
-
-# make up data points
-# np.random.seed(1234)
-points = np.random.rand(15, 2)
-
-# compute Voronoi tesselation
-vor = Voronoi(points)
-
-# plot
-regions, vertices = voronoi_finite_polygons_2d(vor)
-# print("--")
-# print(regions)
-# print("--")
-# print(vertices)
-
-# colorize
-for region in regions:
-    polygon = vertices[region]
-    plt.fill(*zip(*polygon), alpha=0.4)
-
-    plt.axis('equal')
-    plt.xlim(vor.min_bound[0] - 0.1, vor.max_bound[0] + 0.1)
-    plt.ylim(vor.min_bound[1] - 0.1, vor.max_bound[1] + 0.1)
-    plt.show()
-
-# plt.plot(points[:,0], points[:,1], 'ko')
-plt.axis('equal')
-plt.xlim(vor.min_bound[0] - 0.1, vor.max_bound[0] + 0.1)
-plt.ylim(vor.min_bound[1] - 0.1, vor.max_bound[1] + 0.1)
-
-plt.savefig('voro.png')
-plt.show()
