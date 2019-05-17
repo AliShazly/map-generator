@@ -119,7 +119,7 @@ def voronoi_finite_polygons_2d(vor):
 
     return new_regions, np.asarray(new_vertices)
 
-def plot(vor, noise_arr):
+def plot(vor, noise_arr, show_plot=True):
         '''Plots a voronoi diagram with colors representing land and sea
         Params:
             vor : Scipy voronoi object
@@ -145,7 +145,7 @@ def plot(vor, noise_arr):
             try:
                 color = noise_arr[x][y]
             except IndexError:
-                print(f'IndexError coords: {x}, {y}')
+                # print(f'IndexError coords: {x}, {y}')
                 color = 0
 
             if color < 50:
@@ -158,5 +158,6 @@ def plot(vor, noise_arr):
         plt.xlim(0, 1)
         plt.ylim(0, 1)
 
-        plt.savefig('voro.png')
-        plt.show()
+        plt.savefig('images/voro.png')
+        if show_plot:
+            plt.show()
