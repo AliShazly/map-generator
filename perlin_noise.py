@@ -62,11 +62,11 @@ class Perlin:
         dot4 = self._dot((x, y - 1), grad4)
 
         # Interpolate the results, add 1 and divide by 2 to adjust range
-        thresh1 = 1.5  # 0 - 2
-        thresh2 = 2.8  # > 2
+        thresh1 = .7  # 0 - 2
+        thresh2 = 1.4  # > 2
         return (self._lerp(self._lerp(dot3, dot4, self._f(x)), self._lerp(dot2, dot1, self._f(x)), self._f(y)) + thresh1) / thresh2
     
-    def create_image(self, width=500, height=500, out_path='./noise.png'):
+    def create_image(self, width=500, height=500, save=False, out_path='./noise.png'):
         '''Exports the perlin noise as a greyscale image'''
         img = Image.new('L', (height, width), 255)
         data = img.load()
@@ -74,12 +74,15 @@ class Perlin:
             for y in range(width):
                 value = self.perlin_noise(x, y)
                 data[x, y] = math.floor(value * 255)
-        img.save(out_path)
+        if save:
+            img.save(out_path)
+        return img
+
 
 def main():
-    freq = 200  # Freq, smaller is more dense
-    noise = Perlin(freq, seed='seed')
-    noise.create_image(width=600, height=600, out_path='./noise.png')
+    freq = 25  # Freq, smaller is more dense
+    noise = Perlin(freq)
+    noise.create_image(width=200, height=200, save=True)
 
 if __name__ == '__main__':
     main()
