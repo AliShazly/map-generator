@@ -68,7 +68,7 @@ class Perlin:
         thresh2 = 1.4  # > 2
         return (self._lerp(self._lerp(dot3, dot4, self._f(x)), self._lerp(dot2, dot1, self._f(x)), self._f(y)) + thresh1) / thresh2
     
-    def create_image(self, width=500, height=500, save=False, out_path='./noise.png'):
+    def create_image(self, width=500, height=500, save=False, out_path='images/noise.png'):
         '''Exports the perlin noise as a greyscale image'''
         img = Image.new('L', (height, width), 255)
         data = img.load()
