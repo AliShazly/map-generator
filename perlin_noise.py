@@ -2,6 +2,8 @@ import math
 import random
 from PIL import Image
 import hashlib
+import numpy as np
+import scipy.stats as st
 
 # http://staffwww.itn.liu.se/~stegu/simplexnoise/simplexnoise.pdf
 # https://eev.ee/blog/2016/05/29/perlin-noise/
@@ -77,12 +79,39 @@ class Perlin:
         if save:
             img.save(out_path)
         return img
+    
+    def gaussian_kernel(self, image, nsig=3.5):
+        '''Multiplies the image by a gaussian kernel'''
+
+        def scale(x, out_range=(0, 1)):
+            domain = np.min(x), np.max(x)
+            y = (x - (domain[1] + domain[0]) / 2) / (domain[1] - domain[0])
+            return y * (out_range[1] - out_range[0]) + (out_range[1] + out_range[0]) / 2
+
+        image_arr = np.array(image)
+        image_norm = scale(image_arr)
+
+        kernlen = image_arr.shape[0]
+
+        interval = (2*nsig+1.)/(kernlen)
+        x = np.linspace(-nsig-interval/2., nsig+interval/2., kernlen+1)
+        kern1d = np.diff(st.norm.cdf(x))
+        kernel_raw = np.sqrt(np.outer(kern1d, kern1d))
+        kernel = kernel_raw/kernel_raw.sum()
+        kernel = scale(kernel)
+
+        image_norm *= kernel
+        image_norm = scale(image_norm, (0, 255))
+        noise_image = Image.fromarray(image_norm).convert('L')
+
+        return noise_image
+
 
 
 def main():
     freq = 25  # Freq, smaller is more dense
     noise = Perlin(freq)
-    noise.create_image(width=200, height=200, save=True)
+    img = noise.create_image(width=200, height=200, save=True)
 
 if __name__ == '__main__':
     main()
