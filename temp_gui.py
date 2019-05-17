@@ -32,7 +32,10 @@ class MainWindow():
         frequency = self.slider_01.get()
         frequency = 150 - frequency  # Reversing frequency to make more sense
         noise = Perlin(frequency)
-        noise.create_image(width=600, height=600, out_path='./noise.png')
+        img = noise.create_image(width=600, height=600)
+        img_gauss = noise.gaussian_kernel(img)
+        img_gauss.save('noise.png')
+
         self.image = PhotoImage(file=self.image_path)
         self.canvas.itemconfig(self.image_on_canvas, image=self.image)
 
