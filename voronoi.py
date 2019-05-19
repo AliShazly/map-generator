@@ -10,6 +10,12 @@ class VoronoiDiagram:
         self.points = np.random.random((num_points, 2))
         self.bounding_region = [min(self.points[:, 0]), max(self.points[:, 0]), min(self.points[:, 1]), max(self.points[:, 1])]
 
+    def _region_centroid(self, vertices):
+        x_vals = [i[0] for i in vertices]
+        y_vals = [i[1] for i in vertices]
+        centroid_x = sum(x_vals) / len(x_vals)
+        centroid_y = sum(y_vals) / len(y_vals)
+        return np.array([[centroid_x, centroid_y]])
 
     def generate_voronoi(self):
         # https://stackoverflow.com/questions/28665491/getting-a-bounded-polygon-coordinates-from-voronoi-cells
@@ -33,22 +39,7 @@ class VoronoiDiagram:
                 self.filtered_regions.append(region)
         return self.vor
 
-    def _region_centroid(self, vertices):
-        signed_area = 0
-        C_x = 0
-        C_y = 0
-        for i in range(len(vertices)-1):
-            step = (vertices[i, 0]*vertices[i+1, 1])-(vertices[i+1, 0]*vertices[i, 1])
-            signed_area += step
-            C_x += (vertices[i, 0] + vertices[i+1, 0])*step
-            C_y += (vertices[i, 1] + vertices[i+1, 1])*step
-        signed_area = 1/2*signed_area
-        C_x = (1.0/(6.0*signed_area))*C_x
-        C_y = (1.0/(6.0*signed_area))*C_y
-        return np.array([[C_x, C_y]])
-
     def relax_points(self, iterations=1):
-        # https://stackoverflow.com/questions/17637244/voronoi-and-lloyd-relaxation-using-python-scipy
         for i in range(iterations):
             centroids = []
             for region in self.filtered_regions:
@@ -118,46 +109,3 @@ def voronoi_finite_polygons_2d(vor):
         new_regions.append(new_region.tolist())
 
     return new_regions, np.asarray(new_vertices)
-
-def plot(vor, noise_arr, show_plot=True):
-        '''Plots a voronoi diagram with colors representing land and sea
-        Params:
-            vor : Scipy voronoi object
-            noise_arr : 2D numpy perlin noise array
-
-        '''
-        regions, vertices = voronoi_finite_polygons_2d(vor)
-        for region in regions:
-            p = vertices[region]
-            polygon = vertices[region]
-
-            polygon_no_neg = [i for i in polygon if i[0] >= 0 and i[1] >= 0]
-            polygon_normalized = [i for i in polygon_no_neg if i[0] <= 1 and i[1] <= 1]
-
-            
-            coords = polygon_no_neg[0]
-            coords *= noise_arr.shape[0]
-
-            
-            x = int(round(coords[0]))
-            y = int(round(coords[1]))
-
-            try:
-                color = noise_arr[x][y]
-            except IndexError:
-                # print(f'IndexError coords: {x}, {y}')
-                color = 0
-
-            if color < 50:
-                plt.fill(*zip(*p), 'b', alpha=1)
-            else:
-                plt.fill(*zip(*p), 'g', alpha=1)
-
-
-        # plt.plot(points[:,0], points[:,1], 'ko')
-        plt.xlim(0, 1)
-        plt.ylim(0, 1)
-
-        plt.savefig('images/voro.png')
-        if show_plot:
-            plt.show()
