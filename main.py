@@ -122,13 +122,29 @@ class MapGenerator:
         noise_arr = np.array(noise_resized)
 
         self._generate_base_terrain(noise_arr)
+        self._add_beaches()
+        # self._generate_temperature_points()
+    
+    def plot(self):
 
-        # self._generate_temperature_points(self.land_polygons)
+        def fill(poly_list, color, alpha):
+            for i in poly_list:
+                plt.fill(*zip(*i), color, alpha=alpha)
 
-        self._add_shallow_water()
+        fill(self.land_polygons, 'g', 1)
+        fill(self.water_polygons, 'b', 1)
+        fill(self.beach_polys, 'y', 1)
+
+        plt.xlim(0, 1)
+        plt.ylim(0, 1)
+
+        plt.savefig('images/voro.png', dpi=150)
+        # plt.show()
+
 
 
 if __name__ == '__main__':
     full_frame()
     generator = MapGenerator()
     generator.generate_map()
+    generator.plot()
