@@ -44,7 +44,7 @@ class MapGenerator:
 
     def _generate_base_terrain(self, noise_arr):
         self.land_polygons = []
-        self.sea_polygons = []
+        self.water_polygons = []
 
         for polygon in self.polygons:
 
@@ -66,64 +66,40 @@ class MapGenerator:
                 color = 0
 
             if color < 50:
-                self.sea_polygons.append(p)
-                plt.fill(*zip(*p), 'c', alpha=1)
+                self.water_polygons.append(p)
             else:
                 self.land_polygons.append(p)
-                plt.fill(*zip(*p), 'g', alpha=1)
 
-        plt.xlim(0, 1)
-        plt.ylim(0, 1)
-        plt.savefig('images/voro.png')
+    def _add_beaches(self):
+        water_sums = [np.sum(i) for i in self.water_polygons]
 
-    def _add_shallow_water(self):
-        polys_sorted = sorted(self.sea_polygons, key=lambda x: x[0][0])
-        land_sums = [np.sum(i) for i in self.land_polygons]
-
-        x = polys_sorted[50]
-        c = self._region_centroid(x)
-        y = self._get_polygon(c)
-
-        shallow_polys = []
-        for p in polys_sorted:
+        self.beach_polys = []
+        beach_indicies = []
+        for idx, p in enumerate(self.land_polygons):
             flag = False
             neighbors = self._get_neighbors(p)
             for i in neighbors:
-                if np.sum(i) in land_sums:
+                if np.sum(i) in water_sums:
                     flag = True
-            if not flag:
-                shallow_polys.append(p)
-        
-        for i in shallow_polys:
-            plt.fill(*zip(*i), 'b', alpha=1)
+            if flag:
+                self.beach_polys.append(p)
+                beach_indicies.append(idx)
 
-        plt.xlim(0, 1)
-        plt.ylim(0, 1)
-        plt.savefig('images/voro.png')
+        # Overwriting land cells
+        for i in sorted(beach_indicies, reverse=True):
+            del self.land_polygons[i]
 
-    def _generate_temperature_points(self, land_polygons, min_distance=0.1):
-        hot_polygon, cold_polygon = random.sample(land_polygons, 2)
+    def _generate_temperature_points(self, min_distance=0.1):
+        hot_polygon, cold_polygon = random.sample(self.land_polygons, 2)
         
         hot_point = self._region_centroid(hot_polygon)
         cold_point = self._region_centroid(cold_polygon)
 
         # TODO: Do this differently, recursion breaks too easily
         if self._distance(hot_point, cold_point) < min_distance:
-            return self._generate_temperature_points(land_polygons)
+            return self._generate_temperature_points(self.land_polygons)
 
-        plt.fill(*zip(*hot_polygon), 'r', alpha=1)
-        plt.fill(*zip(*cold_polygon), 'p', alpha=1)
-
-        plt.plot([cold_point[0]], [cold_point[1]], marker='o', markersize=3, color='b')
-        plt.plot([hot_point[0]], [hot_point[1]], marker='o', markersize=3, color='b')
-
-        plt.xlim(0, 1)
-        plt.ylim(0, 1)
-
-        plt.savefig('images/voro.png', dpi=150)
-        # plt.show()
-
-    def generate_map(self, size=50, freq=20, lloyds=2, sigma=3.5):
+    def generate_map(self, size=50, freq=20, lloyds=2, sigma=3.15):
         # make up data points
         size_sqrt = size
         size = size ** 2
