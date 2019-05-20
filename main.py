@@ -35,7 +35,7 @@ def timer(function):
 
 class MapGenerator:
 
-    def fill_polys(self, poly_list, color='r', alpha=1):
+    def _fill_polys(self, poly_list, color='r', alpha=1):
         for i in poly_list:
             plt.fill(*zip(*i), color, alpha=alpha)
 
@@ -129,7 +129,7 @@ class MapGenerator:
             return self._generate_temperature_points(self.land_polygons)
     
     @timer
-    def generate_map(self, size=75, freq=20, lloyds=2, sigma=3.15):
+    def generate_map(self, size=50, freq=20, lloyds=3, sigma=3.15):
         # make up data points
         size_sqrt = size
         size = size ** 2
@@ -155,9 +155,12 @@ class MapGenerator:
     
     @timer
     def plot(self):
-        self.fill_polys(self.land_polygons, 'g', 1)
-        self.fill_polys(self.water_polygons, 'b', 1)
-        self.fill_polys(self.beach_polys, 'y', 1)
+        land = '#37754D'
+        water = '#285A8F'
+        beach = '#877965'
+        self._fill_polys(self.land_polygons, land)
+        self._fill_polys(self.water_polygons, water)
+        self._fill_polys(self.beach_polys, beach)
 
         plt.xlim(0, 1)
         plt.ylim(0, 1)
