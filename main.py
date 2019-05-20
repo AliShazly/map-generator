@@ -20,26 +20,31 @@ def full_frame(width=None, height=None):
 
 class MapGenerator:
 
-    def _region_centroid(self, vertices):
-        x_vals = [i[0] for i in vertices]
-        y_vals = [i[1] for i in vertices]
+    def _get_centroid(self, polygon):
+        x_vals = [i[0] for i in polygon]
+        y_vals = [i[1] for i in polygon]
         centroid_x = sum(x_vals) / len(x_vals)
         centroid_y = sum(y_vals) / len(y_vals)
         return centroid_x, centroid_y
 
-    def _distance(self, pt1, pt2):
-        return np.sqrt((pt2[0] - pt1[0])** 2 + (pt2[1] - pt1[1])** 2)
-
     def _get_polygon(self, centroid):
         index = self.centroids.index(centroid)
         return self.polygons[index]
+
+    def _distance(self, pt1, pt2):
+        return np.sqrt((pt2[0] - pt1[0])** 2 + (pt2[1] - pt1[1])** 2)
         
     def _get_neighbors(self, main_polygon):
-        size = len(main_polygon)
-        centroid = self._region_centroid(main_polygon)
+        # TODO: This seems dumb, try a different way
+        centroid = self._get_centroid(main_polygon)
         sorted_centroids = sorted(self.centroids, key=lambda x: self._distance(x, centroid))
-        centroid_neighbors = sorted_centroids[:size]
-        polygon_neighbors = [self._get_polygon(i) for i in centroid_neighbors]
+        centroid_neighbors = sorted_centroids[:10]
+        polygon_near = [self._get_polygon(i) for i in centroid_neighbors]
+        polygon_neighbors = []
+        for point in main_polygon:
+            for polygon in polygon_near:
+                if point in polygon:
+                    polygon_neighbors.append(polygon)
         return polygon_neighbors
 
     def _generate_base_terrain(self, noise_arr):
@@ -71,6 +76,7 @@ class MapGenerator:
                 self.land_polygons.append(p)
 
     def _add_beaches(self):
+        # TODO: Do this differently. This is extremely dumb
         water_sums = [np.sum(i) for i in self.water_polygons]
 
         self.beach_polys = []
@@ -92,8 +98,8 @@ class MapGenerator:
     def _generate_temperature_points(self, min_distance=0.1):
         hot_polygon, cold_polygon = random.sample(self.land_polygons, 2)
         
-        hot_point = self._region_centroid(hot_polygon)
-        cold_point = self._region_centroid(cold_polygon)
+        hot_point = self._get_centroid(hot_polygon)
+        cold_point = self._get_centroid(cold_polygon)
 
         # TODO: Do this differently, recursion breaks too easily
         if self._distance(hot_point, cold_point) < min_distance:
@@ -111,7 +117,7 @@ class MapGenerator:
         regions, vertices = voronoi_finite_polygons_2d(self.voronoi_diagram)
 
         self.polygons = [vertices[region] for region in regions]
-        self.centroids = [self._region_centroid(i) for i in self.polygons]
+        self.centroids = [self._get_centroid(i) for i in self.polygons]
 
         # Get noise, turn into 1D array
         noise = Perlin(freq)
