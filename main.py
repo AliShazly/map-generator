@@ -1,5 +1,7 @@
 import numpy as np
 import random
+import time
+from functools import wraps
 from PIL import Image
 import matplotlib.pyplot as plt
 
@@ -18,7 +20,24 @@ def full_frame(width=None, height=None):
     plt.autoscale(tight=True)
 
 
+def timer(function):
+    @wraps(function)
+    def wrapper(*args, **kwargs):
+        start = time.time()
+        result = function(*args, **kwargs)
+        end = time.time()
+        elapsed = round(end - start, 2)
+        if elapsed > 0.0:
+            print(f'{function.__name__} took {elapsed} seconds.')
+        return result
+    return wrapper
+
+
 class MapGenerator:
+
+    def fill_polys(self, poly_list, color='r', alpha=1):
+        for i in poly_list:
+            plt.fill(*zip(*i), color, alpha=alpha)
 
     def _get_centroid(self, polygon):
         x_vals = [i[0] for i in polygon]
@@ -33,20 +52,23 @@ class MapGenerator:
 
     def _distance(self, pt1, pt2):
         return np.sqrt((pt2[0] - pt1[0])** 2 + (pt2[1] - pt1[1])** 2)
-        
+    
     def _get_neighbors(self, main_polygon):
-        # TODO: This seems dumb, try a different way
-        centroid = self._get_centroid(main_polygon)
-        sorted_centroids = sorted(self.centroids, key=lambda x: self._distance(x, centroid))
-        centroid_neighbors = sorted_centroids[:10]
-        polygon_near = [self._get_polygon(i) for i in centroid_neighbors]
+        x, y = main_polygon[0][0], main_polygon[0][1]
+
+        d_t = 0.1  # Distance threshold
+        polygons_close = [i for i in self.polygons
+            if x - d_t <= i[0][0] <= x + d_t
+            and y - d_t <= i[0][1] <= y + d_t]
+        
         polygon_neighbors = []
         for point in main_polygon:
-            for polygon in polygon_near:
+            for polygon in polygons_close:
                 if point in polygon:
                     polygon_neighbors.append(polygon)
         return polygon_neighbors
 
+    @timer
     def _generate_base_terrain(self, noise_arr):
         self.land_polygons = []
         self.water_polygons = []
@@ -75,27 +97,28 @@ class MapGenerator:
             else:
                 self.land_polygons.append(p)
 
-    def _add_beaches(self):
+    @timer
+    def add_beaches(self):
         # TODO: Do this differently. This is extremely dumb
         water_sums = [np.sum(i) for i in self.water_polygons]
 
         self.beach_polys = []
         beach_indicies = []
-        for idx, p in enumerate(self.land_polygons):
+        for idx, land_poly in enumerate(self.land_polygons):
             flag = False
-            neighbors = self._get_neighbors(p)
+            neighbors = self._get_neighbors(land_poly)
             for i in neighbors:
                 if np.sum(i) in water_sums:
                     flag = True
             if flag:
-                self.beach_polys.append(p)
+                self.beach_polys.append(land_poly)
                 beach_indicies.append(idx)
 
         # Overwriting land cells
         for i in sorted(beach_indicies, reverse=True):
             del self.land_polygons[i]
 
-    def _generate_temperature_points(self, min_distance=0.1):
+    def generate_temperature_points(self, min_distance=0.1):
         hot_polygon, cold_polygon = random.sample(self.land_polygons, 2)
         
         hot_point = self._get_centroid(hot_polygon)
@@ -104,8 +127,9 @@ class MapGenerator:
         # TODO: Do this differently, recursion breaks too easily
         if self._distance(hot_point, cold_point) < min_distance:
             return self._generate_temperature_points(self.land_polygons)
-
-    def generate_map(self, size=50, freq=20, lloyds=2, sigma=3.15):
+    
+    @timer
+    def generate_map(self, size=75, freq=20, lloyds=2, sigma=3.15):
         # make up data points
         size_sqrt = size
         size = size ** 2
@@ -128,18 +152,12 @@ class MapGenerator:
         noise_arr = np.array(noise_resized)
 
         self._generate_base_terrain(noise_arr)
-        self._add_beaches()
-        # self._generate_temperature_points()
     
+    @timer
     def plot(self):
-
-        def fill(poly_list, color, alpha):
-            for i in poly_list:
-                plt.fill(*zip(*i), color, alpha=alpha)
-
-        fill(self.land_polygons, 'g', 1)
-        fill(self.water_polygons, 'b', 1)
-        fill(self.beach_polys, 'y', 1)
+        self.fill_polys(self.land_polygons, 'g', 1)
+        self.fill_polys(self.water_polygons, 'b', 1)
+        self.fill_polys(self.beach_polys, 'y', 1)
 
         plt.xlim(0, 1)
         plt.ylim(0, 1)
@@ -153,4 +171,6 @@ if __name__ == '__main__':
     full_frame()
     generator = MapGenerator()
     generator.generate_map()
+    generator.add_beaches()
+
     generator.plot()
