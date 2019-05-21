@@ -17,6 +17,7 @@ def full_frame(width=None, height=None):
     ax = plt.axes([0,0,1,1], frameon=False)
     ax.get_xaxis().set_visible(False)
     ax.get_yaxis().set_visible(False)
+    ax.set_aspect(1)
     plt.autoscale(tight=True)
 
 
@@ -134,7 +135,9 @@ class MapGenerator:
 
     @timer
     def add_beaches(self):
-        '''Changes edges of land masses into beaches'''
+        '''Changes land borders touching water into beaches
+            Not used since elevation does this better
+        '''
         self.beach_polys = []
         beach_indicies = []
         for idx, land_poly in enumerate(self.land_polygons):
@@ -182,34 +185,32 @@ class MapGenerator:
                     queue.append(i)
 
     @timer
-    def add_elevation_basic(self):
-        '''Defines a height from 0-255 for each land cell based on distance from the coast
+    def add_elevation(self):
+        '''Defines a height from 1-5 for each land cell based on distance from the coast
             Usually results in the map looking like one big mountain
         '''
         self.land_height = []
-        ocean_centroids = [self._get_centroid(poly) for poly in self.deep_water_polys]
+
+        water_cents = [self._get_centroid(poly) for poly in self.water_polygons]
+        if self.deep_water_polys:
+            deep_cents = [self._get_centroid(poly) for poly in self.deep_water_polys]
+            water_cents += deep_cents
+
         for poly in self.land_polygons:
             centroid = self._get_centroid(poly)
-            nearest_water = self._get_closest_centroid(centroid, ocean_centroids)
+            nearest_water = self._get_closest_centroid(centroid, water_cents)
             distance = self._distance(centroid, nearest_water)
             self.land_height.append(distance)
 
-        min_dist = min(self.land_height)
-        max_dist = max(self.land_height)
+        def normalize(list, new_min, new_max):
+            array = np.array(list) 
+            arr_max = np.max(array)
+            arr_min = np.min(array)
 
+            m = (new_max - new_min) / (arr_max - arr_min)
+            return (m * (array - arr_min)) + new_min
 
-        def normalize(list, bounds):
-            l = np.array(list) 
-            a = np.max(l)
-            c = np.min(l)
-            b = bounds[1]
-            d = bounds[0]
-
-            m = (b - d) / (a - c)
-            pslope = (m * (l - c)) + d
-            return pslope
-
-        self.land_height = normalize(self.land_height, (0, 255))
+        self.land_height = normalize(self.land_height, 0, 5)
 
     @timer
     def generate_map(self, size=75, freq=20, lloyds=2, sigma=3.15):
@@ -243,32 +244,56 @@ class MapGenerator:
         '''Plots and colors the voronoi map'''
 
         def rgb2hex(rgb):
+            rgb = tuple([int(i) for i in rgb])
             return '#%02x%02x%02x' % rgb
 
-        # land_norm = [(int(i*1024) if (int(i*1024)) <= 255 else 255) for i in self.land_height]
-        # land_rgb = [(i, i, i) for i in land_norm]
-        # land_hex = [rgb2hex(i) for i in land_rgb]
+        land_01 = '#A6977B'
+        land_02 = '#679459'
+        land_03 = '#85A979'
+        land_04 = '#9CB993'
+        land_05 = '#BCCFB5'
 
-        land = '#37754D'
-        water_deep = '#285A8F'
-        water_shallow = '#2685A6'
-        beach = '#877965'
+        water_shallow = '#498DC9'
+        water_deep = '#356894'
+        beach = '#A6977B'
 
+        # Giving the plot black borders
         self._fill_polys(self.polygons, 'black')
-        self._fill_polys(self.land_polygons, land)
-        self._fill_polys(self.water_polygons, water_shallow)
-        self._fill_polys(self.beach_polys, beach)
-        self._fill_polys(self.deep_water_polys, water_deep)
 
-        plt.savefig(path, dpi=150)
+        for poly, height in zip(self.land_polygons, self.land_height):
+            if 0 <= height < 0.7:  # Too many beaches. lowered threshold
+                color = land_01
+            elif 0.7 <= height < 2:
+                color = land_02
+            elif 2 <= height < 3:
+                color = land_03
+            elif 3 <= height < 4:
+                color = land_04
+            else:
+                color = land_05
+            self._fill_polys(poly, color, single=True)
+
+        self._fill_polys(self.water_polygons, water_shallow)
+        
+        try:
+            self._fill_polys(self.deep_water_polys, water_deep)
+        except AttributeError:
+            pass
+
+        try:
+            self._fill_polys(self.beach_polys, beach)
+        except AttributeError:
+            pass
+
+        plt.savefig(path, dpi=200)
 
 
 if __name__ == '__main__':
-    full_frame()
+    full_frame(3, 3)
     generator = MapGenerator()
-    generator.generate_map()
-    generator.add_beaches()
+    generator.generate_map(size=75, freq=20, lloyds=2, sigma=3.15)
     generator.add_deep_water()
-    # generator.add_elevation_basic()  # TODO: Finish this method
+    # generator.add_beaches()
+    generator.add_elevation()
 
     generator.plot()
