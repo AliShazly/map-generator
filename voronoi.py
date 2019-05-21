@@ -3,14 +3,17 @@ from scipy.spatial import Voronoi
 import sys
 from PIL import Image
 import matplotlib.pyplot as plt
+from shapely.geometry import MultiPoint, Point, Polygon
+
 
 class VoronoiDiagram:
 
-    def __init__(self, num_points=100, dimensions = (None, None)):
-        self.points = np.random.random((num_points, 2))
+    def __init__(self, points, dimensions = (None, None)):
+        self.points = points
         self.bounding_region = [min(self.points[:, 0]), max(self.points[:, 0]), min(self.points[:, 1]), max(self.points[:, 1])]
 
     def _region_centroid(self, vertices):
+        # I actually wrote this one! 
         x_vals = [i[0] for i in vertices]
         y_vals = [i[1] for i in vertices]
         centroid_x = sum(x_vals) / len(x_vals)
@@ -109,3 +112,19 @@ def voronoi_finite_polygons_2d(vor):
         new_regions.append(new_region.tolist())
 
     return new_regions, np.asarray(new_vertices)
+
+def clip(points, regions, vertices):
+    # https://stackoverflow.com/questions/34968838/python-finite-boundary-voronoi-cells
+    pts = MultiPoint([Point(i) for i in points])
+    mask = pts.convex_hull
+    new_vertices = []
+    for region in regions:
+        polygon = vertices[region]
+        shape = list(polygon.shape)
+        shape[0] += 1
+        p = Polygon(np.append(polygon, polygon[0]).reshape(*shape)).intersection(mask)
+        poly = list(zip(p.boundary.coords.xy[0][:-1], p.boundary.coords.xy[1][:-1]))
+        poly = [list(i) for i in poly]
+        new_vertices.append(poly)
+
+    return new_vertices
