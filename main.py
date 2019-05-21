@@ -2,7 +2,6 @@ import numpy as np
 import random
 import time
 from functools import wraps
-from PIL import Image
 import matplotlib.pyplot as plt
 
 from voronoi import VoronoiDiagram, voronoi_finite_polygons_2d, clip
@@ -58,9 +57,8 @@ class MapGenerator:
                 return True
         return False
     
-    @timer
     def _get_closest_centroid(self, point, points):
-        points.remove(point)
+        # points.remove(point)
         distances = [self._distance(point, i) for i in points]
         idx = distances.index(np.min(distances))
         return points[idx]
@@ -184,6 +182,36 @@ class MapGenerator:
                     queue.append(i)
 
     @timer
+    def add_elevation_basic(self):
+        '''Defines a height from 0-255 for each land cell based on distance from the coast
+            Usually results in the map looking like one big mountain
+        '''
+        self.land_height = []
+        ocean_centroids = [self._get_centroid(poly) for poly in self.deep_water_polys]
+        for poly in self.land_polygons:
+            centroid = self._get_centroid(poly)
+            nearest_water = self._get_closest_centroid(centroid, ocean_centroids)
+            distance = self._distance(centroid, nearest_water)
+            self.land_height.append(distance)
+
+        min_dist = min(self.land_height)
+        max_dist = max(self.land_height)
+
+
+        def normalize(list, bounds):
+            l = np.array(list) 
+            a = np.max(l)
+            c = np.min(l)
+            b = bounds[1]
+            d = bounds[0]
+
+            m = (b - d) / (a - c)
+            pslope = (m * (l - c)) + d
+            return pslope
+
+        self.land_height = normalize(self.land_height, (0, 255))
+
+    @timer
     def generate_map(self, size=75, freq=20, lloyds=2, sigma=3.15):
         '''Initializes the map and generates the base noise and voronoi diagram'''
         # make up data points
@@ -213,10 +241,19 @@ class MapGenerator:
     @timer
     def plot(self, path='images/voro.png'):
         '''Plots and colors the voronoi map'''
+
+        def rgb2hex(rgb):
+            return '#%02x%02x%02x' % rgb
+
+        # land_norm = [(int(i*1024) if (int(i*1024)) <= 255 else 255) for i in self.land_height]
+        # land_rgb = [(i, i, i) for i in land_norm]
+        # land_hex = [rgb2hex(i) for i in land_rgb]
+
         land = '#37754D'
         water_deep = '#285A8F'
         water_shallow = '#2685A6'
         beach = '#877965'
+
         self._fill_polys(self.polygons, 'black')
         self._fill_polys(self.land_polygons, land)
         self._fill_polys(self.water_polygons, water_shallow)
@@ -232,5 +269,6 @@ if __name__ == '__main__':
     generator.generate_map()
     generator.add_beaches()
     generator.add_deep_water()
+    generator.add_elevation_basic()
 
     generator.plot()
