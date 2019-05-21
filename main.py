@@ -22,6 +22,7 @@ def full_frame(width=None, height=None):
 
 
 def timer(function):
+    '''Prints the time a function took to run'''
     @wraps(function)
     def wrapper(*args, **kwargs):
         start = time.time()
@@ -36,6 +37,8 @@ def timer(function):
 class MapGenerator:
     
     def _fill_polys(self, poly_list, color='r', alpha=1, single=False):
+        '''Fills polygons on the pyplot graph'''
+        # Setting the limits lower to hide map border
         plt.xlim(.05, .95)
         plt.ylim(.05, .95)
         if single:
@@ -45,15 +48,18 @@ class MapGenerator:
                 plt.fill(*zip(*i), color, alpha=alpha)
 
     def _distance(self, pt1, pt2):
+        '''Returns the distance between two points'''
         return np.sqrt((pt2[0] - pt1[0])** 2 + (pt2[1] - pt1[1])** 2)
 
     def _polygon_is_in(self, poly, poly_lst):
+        '''Checks if a polygon is in a list of polygons'''
         for i in poly_lst:
             if i == poly:
                 return True
         return False
 
     def _get_centroid(self, polygon):
+        '''Returns the centroid of a polygon'''
         x_vals = [i[0] for i in polygon]
         y_vals = [i[1] for i in polygon]
         centroid_x = sum(x_vals) / len(x_vals)
@@ -61,10 +67,12 @@ class MapGenerator:
         return centroid_x, centroid_y
 
     def _get_polygon(self, centroid):
+        '''Returns a polygon based on it/'s centroid'''
         index = self.centroids.index(centroid)
         return self.polygons[index]
     
     def _get_neighbors(self, main_polygon):
+        '''Finds the adjacent polygons of a polygon'''
         x, y = main_polygon[0][0], main_polygon[0][1]
 
         d_t = 0.1  # Distance threshold
@@ -91,8 +99,8 @@ class MapGenerator:
         
         return neighbors
 
-    @timer
     def _generate_base_terrain(self, noise_arr):
+        '''Generates the terrain as a binary map of land and ocean'''
         self.land_polygons = []
         self.water_polygons = []
         for polygon in self.polygons:
@@ -121,6 +129,7 @@ class MapGenerator:
 
     @timer
     def add_beaches(self):
+        '''Changes edges of land masses into beaches'''
         self.beach_polys = []
         beach_indicies = []
         for idx, land_poly in enumerate(self.land_polygons):
@@ -139,6 +148,8 @@ class MapGenerator:
 
     @timer
     def add_deep_water(self):
+        '''Makes the ocean a deeper color than the lakes surrounded by land'''
+        # Sorting to make sure the starting point is somewhere on the edge
         water_sorted = sorted(self.water_polygons, key=lambda x: x[0][0])
         self.deep_water_polys = []
 
@@ -167,6 +178,7 @@ class MapGenerator:
 
     @timer
     def generate_map(self, size=75, freq=20, lloyds=2, sigma=3.15):
+        '''Initializes the map and generates the base noise and voronoi diagram'''
         # make up data points
         size_sqrt = size
         size = size ** 2
@@ -192,7 +204,8 @@ class MapGenerator:
         self._generate_base_terrain(noise_arr)
     
     @timer
-    def plot(self):
+    def plot(self, path='images/voro.png'):
+        '''Plots and colors the voronoi map'''
         land = '#37754D'
         water_deep = '#285A8F'
         water_shallow = '#2685A6'
@@ -203,7 +216,7 @@ class MapGenerator:
         self._fill_polys(self.beach_polys, beach)
         self._fill_polys(self.deep_water_polys, water_deep)
 
-        plt.savefig('images/voro.png', dpi=150)
+        plt.savefig(path, dpi=150)
 
 
 if __name__ == '__main__':
