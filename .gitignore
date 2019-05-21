@@ -1,5 +1,3 @@
 venv/
 .vscode/
 __pycache__
-noise.png
-voronoi.png
