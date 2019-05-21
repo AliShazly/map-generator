@@ -269,6 +269,6 @@ if __name__ == '__main__':
     generator.generate_map()
     generator.add_beaches()
     generator.add_deep_water()
-    generator.add_elevation_basic()
+    # generator.add_elevation_basic()  # TODO: Finish this method
 
     generator.plot()
