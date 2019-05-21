@@ -5,7 +5,7 @@ from functools import wraps
 from PIL import Image
 import matplotlib.pyplot as plt
 
-from voronoi import *
+from voronoi import VoronoiDiagram, voronoi_finite_polygons_2d, clip
 from perlin_noise import Perlin
 
 def full_frame(width=None, height=None):
@@ -57,6 +57,13 @@ class MapGenerator:
             if i == poly:
                 return True
         return False
+    
+    @timer
+    def _get_closest_centroid(self, point, points):
+        points.remove(point)
+        distances = [self._distance(point, i) for i in points]
+        idx = distances.index(np.min(distances))
+        return points[idx]
 
     def _get_centroid(self, polygon):
         '''Returns the centroid of a polygon'''
