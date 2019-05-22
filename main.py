@@ -59,7 +59,6 @@ class MapGenerator:
         return False
     
     def _get_closest_centroid(self, point, points):
-        # points.remove(point)
         distances = [self._distance(point, i) for i in points]
         idx = distances.index(np.min(distances))
         return points[idx]
@@ -134,25 +133,19 @@ class MapGenerator:
                 self.land_polygons.append(p)
 
     @timer
-    def add_beaches(self):
-        '''Changes land borders touching water into beaches
-            Not used since elevation does this better
-        '''
-        self.beach_polys = []
-        beach_indicies = []
-        for idx, land_poly in enumerate(self.land_polygons):
-            flag = False
-            neighbors = self._get_neighbors(land_poly)
+    def _define_coastline(self):
+        '''Makes a "coastline" that consists of water polys that border land polys'''
+        water_polygons = self.water_polygons.copy()
+        if self.deep_water_polys:
+            water_polygons += self.deep_water_polys.copy()
+
+        self.coastline = []
+        for water_poly in water_polygons:
+            neighbors = self._get_neighbors(water_poly)
             for i in neighbors:
-                if self._polygon_is_in(i, self.water_polygons):
-                    flag = True
-            if flag:
-                self.beach_polys.append(land_poly)
-                beach_indicies.append(idx)
-        
-        # Overwriting land cells
-        for idx in sorted(beach_indicies, reverse=True):
-            del self.land_polygons[idx]
+                if self._polygon_is_in(i, self.land_polygons):
+                    self.coastline.append(water_poly)
+                    break
 
     @timer
     def add_deep_water(self):
@@ -191,10 +184,8 @@ class MapGenerator:
         '''
         self.land_height = []
 
-        water_cents = [self._get_centroid(poly) for poly in self.water_polygons]
-        if self.deep_water_polys:
-            deep_cents = [self._get_centroid(poly) for poly in self.deep_water_polys]
-            water_cents += deep_cents
+        self._define_coastline()
+        water_cents = [self._get_centroid(poly) for poly in self.coastline]
 
         for poly in self.land_polygons:
             centroid = self._get_centroid(poly)
@@ -255,23 +246,25 @@ class MapGenerator:
 
         water_shallow = '#498DC9'
         water_deep = '#356894'
-        beach = '#A6977B'
 
         # Giving the plot black borders
         self._fill_polys(self.polygons, 'black')
 
-        for poly, height in zip(self.land_polygons, self.land_height):
-            if 0 <= height < 0.7:  # Too many beaches. lowered threshold
-                color = land_01
-            elif 0.7 <= height < 2:
-                color = land_02
-            elif 2 <= height < 3:
-                color = land_03
-            elif 3 <= height < 4:
-                color = land_04
-            else:
-                color = land_05
-            self._fill_polys(poly, color, single=True)
+        try:
+            for poly, height in zip(self.land_polygons, self.land_height):
+                if 0 <= height < 0.8:  # Too many beaches. lowered threshold
+                    color = land_01
+                elif 0.8 <= height < 2:
+                    color = land_02
+                elif 2 <= height < 3:
+                    color = land_03
+                elif 3 <= height < 4:
+                    color = land_04
+                else:
+                    color = land_05
+                self._fill_polys(poly, color, single=True)
+        except AttributeError:
+            self._fill_polys(self.land_polygons, land_02)
 
         self._fill_polys(self.water_polygons, water_shallow)
         
@@ -280,20 +273,18 @@ class MapGenerator:
         except AttributeError:
             pass
 
-        try:
-            self._fill_polys(self.beach_polys, beach)
-        except AttributeError:
-            pass
-
-        plt.savefig(path, dpi=200)
+        plt.savefig(path, dpi=300)
 
 
-if __name__ == '__main__':
-    full_frame(3, 3)
+@timer
+def main():
+    full_frame(2, 2)
     generator = MapGenerator()
-    generator.generate_map(size=75, freq=20, lloyds=2, sigma=3.15)
+    generator.generate_map(size=50, freq=20, lloyds=2, sigma=3.15)
     generator.add_deep_water()
-    # generator.add_beaches()
     generator.add_elevation()
 
     generator.plot()
+
+if __name__ == '__main__':
+    main()
