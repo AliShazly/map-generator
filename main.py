@@ -10,9 +10,10 @@ from perlin_noise import Perlin
 
 def full_frame(width=None, height=None):
     # https://gist.github.com/kylemcdonald/bedcc053db0e7843ef95c531957cb90f
-    '''Removes frame from matplotlib'''
+    """Removes frame from matplotlib"""
     import matplotlib as mpl
-    mpl.rcParams['savefig.pad_inches'] = 0
+
+    mpl.rcParams["savefig.pad_inches"] = 0
     figsize = None if width is None else (width, height)
     fig = plt.figure(figsize=figsize)
     ax = plt.axes([0, 0, 1, 1], frameon=False)
@@ -23,15 +24,17 @@ def full_frame(width=None, height=None):
 
 
 def timer(function):
-    '''Prints the time a function took to run'''
+    """Prints the time a function took to run"""
+
     @wraps(function)
     def wrapper(*args, **kwargs):
         start = time.time()
         result = function(*args, **kwargs)
         end = time.time()
         elapsed = round(end - start, 2)
-        print(f'{function.__name__} took {elapsed} seconds.')
+        print(f"{function.__name__} took {elapsed} seconds.")
         return result
+
     return wrapper
 
 
@@ -49,7 +52,7 @@ class Polygon:
         self.vertices[idx] = val
 
     def __repr__(self):
-        return f'{self.__class__.__name__}({self.vertices}, {self.biome}, {self.coastline}, {self.elevation})'
+        return f"{self.__class__.__name__}({self.vertices}, {self.biome}, {self.coastline}, {self.elevation})"
 
     @property
     def centroid(self):
@@ -66,24 +69,24 @@ class Biome:
         self.group = group
 
     def __repr__(self):
-        return f'{self.__class__.__name__}({color}, {group})'
+        return f"{self.__class__.__name__}({color}, {group})"
 
 
 class MapGenerator:
     def __init__(self):
-        self.land_beach = Biome('#A6977B', 'land')
-        self.land_01 = Biome('#679459', 'land')
-        self.land_02 = Biome('#85A979', 'land')
-        self.land_03 = Biome('#9CB993', 'land')
-        self.land_04 = Biome('#BCCFB5', 'land')
-        self.shallow_water = Biome('#498DC9', 'water')
-        self.deep_water = Biome('#356894', 'water')
+        self.land_beach = Biome("#A6977B", "land")
+        self.land_01 = Biome("#679459", "land")
+        self.land_02 = Biome("#85A979", "land")
+        self.land_03 = Biome("#9CB993", "land")
+        self.land_04 = Biome("#BCCFB5", "land")
+        self.shallow_water = Biome("#498DC9", "water")
+        self.deep_water = Biome("#356894", "water")
 
-    def _fill_polys(self, poly_list, color='r', alpha=1, single=False):
-        '''Fills polygons on the pyplot graph'''
+    def _fill_polys(self, poly_list, color="r", alpha=1, single=False):
+        """Fills polygons on the pyplot graph"""
         # Setting the limits lower to hide map border
-        plt.xlim(.05, .95)
-        plt.ylim(.05, .95)
+        plt.xlim(0.05, 0.95)
+        plt.ylim(0.05, 0.95)
         if single:
             plt.fill(*zip(*poly_list), color, alpha=alpha)
         else:
@@ -91,7 +94,7 @@ class MapGenerator:
                 plt.fill(*zip(*i), color, alpha=alpha)
 
     def _distance(self, pt1, pt2):
-        '''Returns the distance between two points'''
+        """Returns the distance between two points"""
         return np.sqrt((pt2[0] - pt1[0]) ** 2 + (pt2[1] - pt1[1]) ** 2)
 
     def _get_closest_centroid(self, point, points):
@@ -99,14 +102,13 @@ class MapGenerator:
         idx = distances.index(np.min(distances))
         return points[idx]
 
+    @timer
     def _get_neighbors(self, main_polygon):
-        '''Finds the adjacent polygons of a polygon'''
+        """Finds the adjacent polygons of a polygon"""
         x, y = main_polygon[0][0], main_polygon[0][1]
 
         d_t = 0.1  # Distance threshold
-        polygons_close = [i for i in self.polygons
-                          if x - d_t <= i[0][0] <= x + d_t
-                          and y - d_t <= i[0][1] <= y + d_t]
+        polygons_close = [i for i in self.polygons if x - d_t <= i[0][0] <= x + d_t and y - d_t <= i[0][1] <= y + d_t]
 
         polygon_neighbors = []
         for point in main_polygon:
@@ -114,13 +116,8 @@ class MapGenerator:
                 if point in polygon:
                     polygon_neighbors.append(polygon)
 
-        # # Removing duplicates
-        # neighbors = list(set([tuple([tuple(point) for point in polygon])
-        #                       for polygon in polygon_neighbors]))
-
-        # # Turning back into a nested list
-        # neighbors = [[list(point) for point in polygon]
-        #              for polygon in neighbors]
+        # TODO: Remove duplicates in polygon_neighbors list
+        #   also try and speed this up.
 
         try:
             polygon_neighbors.remove(main_polygon)
@@ -130,7 +127,7 @@ class MapGenerator:
         return polygon_neighbors
 
     def _generate_base_terrain(self, noise_arr):
-        '''Generates the terrain as a binary map of land and ocean'''
+        """Generates the terrain as a binary map of land and ocean"""
         for idx, polygon in enumerate(self.polygons):
             coords = polygon.centroid
             coords = [i * noise_arr.shape[0] for i in coords]
@@ -150,20 +147,20 @@ class MapGenerator:
 
     @timer
     def _define_coastline(self):
-        '''Makes a "coastline" that consists of water polys that border land polys'''
+        """Makes a "coastline" that consists of water polys that border land polys"""
         for idx, poly in enumerate(self.polygons):
-            if poly.biome.group == 'land':
+            if poly.biome.group == "land":
                 continue
             neighbors = self._get_neighbors(poly)
             for neighbor in neighbors:
-                if neighbor.biome.group == 'land':
+                if neighbor.biome.group == "land":
                     poly.coastline = True
                     self.polygons[idx] = poly
                     break
 
     @timer
     def add_deep_water(self):
-        '''Makes the ocean a deeper color than the lakes surrounded by land'''
+        """Makes the ocean a deeper color than the lakes surrounded by land"""
 
         def check_validity(poly):
             if not poly.biome == self.shallow_water:
@@ -174,9 +171,9 @@ class MapGenerator:
 
         queue = []
 
-        # TODO: Kinda dumb way to do this
+        # Grabbing the first water polygon from the polygon list
         for poly in self.polygons:
-            if poly.biome.group == 'water':
+            if poly.biome.group == "water":
                 queue.append(poly)
                 break
 
@@ -197,22 +194,20 @@ class MapGenerator:
 
     @timer
     def add_elevation(self):
-        '''Defines a height from 0-1 for each land cell based on distance from water'''
+        """Defines a height from 0-1 for each land cell based on distance from water"""
 
         def normalize(val, mx, mn):
-            return (val-mn) / (mx-mn)
+            return (val - mn) / (mx - mn)
 
         self._define_coastline()
 
-        water_cents = [poly.centroid for poly in self.polygons
-                       if poly.biome.group == 'water']
+        water_cents = [poly.centroid for poly in self.polygons if poly.biome.group == "water"]
 
         distances = []
         for idx, poly in enumerate(self.polygons):
-            if poly.biome.group == 'land':
+            if poly.biome.group == "land":
                 centroid = poly.centroid
-                nearest_water = self._get_closest_centroid(
-                    centroid, water_cents)
+                nearest_water = self._get_closest_centroid(centroid, water_cents)
                 distance = self._distance(centroid, nearest_water)
                 distances.append((distance, idx))
 
@@ -224,7 +219,7 @@ class MapGenerator:
 
     @timer
     def generate_map(self, size=75, freq=20, lloyds=2, sigma=3.15):
-        '''Initializes the map and generates the base noise and voronoi diagram'''
+        """Initializes the map and generates the base noise and voronoi diagram"""
         # make up data points
         size_sqrt = size
         size = size ** 2
@@ -236,42 +231,40 @@ class MapGenerator:
         self.voronoi_diagram = vor.relax_points(lloyds)
         regions, vertices = voronoi_finite_polygons_2d(self.voronoi_diagram)
 
-        polygons = sorted(clip(points, regions, vertices),
-                          key=lambda x: x[0][0])
-        polygons_stripped = [[vert for vert in poly if 0 <= vert[0] <= 1 and 0 <= vert[1] <= 1]
-                             for poly in polygons]
+        polygons = sorted(clip(points, regions, vertices), key=lambda x: x[0][0])
+        polygons_stripped = [[vert for vert in poly if 0 <= vert[0] <= 1 and 0 <= vert[1] <= 1] for poly in polygons]
         self.polygons = [Polygon(i) for i in polygons_stripped]
 
         # Get noise, turn into 1D array
         noise = Perlin(freq)
         noise_img = noise.create_image(save=True, width=200, height=200)
         noise_gauss = noise.gaussian_kernel(noise_img, nsig=sigma)
-        noise_gauss.save('images/noise.png')
+        noise_gauss.save("images/noise.png")
         noise_resized = noise_gauss.resize((size_sqrt, size_sqrt))
         noise_arr = np.array(noise_resized)
 
         self._generate_base_terrain(noise_arr)
 
     @timer
-    def plot(self, path='images/voro.png'):
-        '''Plots and colors the voronoi map'''
+    def plot(self, path="images/voro.png"):
+        """Plots and colors the voronoi map"""
 
         def rgb2hex(rgb):
             rgb = tuple([int(i) for i in rgb])
-            return '#%02x%02x%02x' % rgb
+            return "#%02x%02x%02x" % rgb
 
         # Giving the plot black borders
-        self._fill_polys(self.polygons, 'black')
+        self._fill_polys(self.polygons, "black")
 
         for poly in self.polygons:
-            if poly.biome.group == 'land':
-                if 0 <= poly.elevation < .18:  # Too many beaches. lowered threshold
+            if poly.biome.group == "land":
+                if 0 <= poly.elevation < 0.18:  # Too many beaches. lowered threshold
                     poly.biome = self.land_beach
-                elif .18 <= poly.elevation < .4:
+                elif 0.18 <= poly.elevation < 0.4:
                     poly.biome = self.land_01
-                elif .4 <= poly.elevation < .6:
+                elif 0.4 <= poly.elevation < 0.6:
                     poly.biome = self.land_02
-                elif .6 <= poly.elevation < .8:
+                elif 0.6 <= poly.elevation < 0.8:
                     poly.biome = self.land_03
                 else:
                     poly.biome = self.land_04
@@ -291,5 +284,5 @@ def main():
     generator.plot()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
