@@ -1,5 +1,4 @@
 import numpy as np
-import random
 import time
 from functools import wraps
 import matplotlib.pyplot as plt
@@ -39,7 +38,7 @@ def timer(function):
 
 
 class Polygon:
-    def __init__(self, vertices, biome=None, coastline=False, elevation=None):
+    def __init__(self, vertices, biome=None, coastline=False, elevation=-1):
         self.vertices = vertices
         self.biome = biome
         self.coastline = coastline
@@ -51,8 +50,14 @@ class Polygon:
     def __setitem__(self, idx, val):
         self.vertices[idx] = val
 
+    def __len__(self):
+        return len(self.vertices)
+
     def __repr__(self):
         return f"{self.__class__.__name__}({self.vertices}, {self.biome}, {self.coastline}, {self.elevation})"
+
+    def index(self, item):
+        return self.vertices.index(item)
 
     @property
     def centroid(self):
@@ -69,18 +74,22 @@ class Biome:
         self.group = group
 
     def __repr__(self):
-        return f"{self.__class__.__name__}({color}, {group})"
+        return f"{self.__class__.__name__}({self.color}, {self.group})"
+
+
+LAND = "land"
+WATER = "water"
 
 
 class MapGenerator:
     def __init__(self):
-        self.land_beach = Biome("#A6977B", "land")
-        self.land_01 = Biome("#679459", "land")
-        self.land_02 = Biome("#85A979", "land")
-        self.land_03 = Biome("#9CB993", "land")
-        self.land_04 = Biome("#BCCFB5", "land")
-        self.shallow_water = Biome("#498DC9", "water")
-        self.deep_water = Biome("#356894", "water")
+        self.land_beach = Biome("#A6977B", LAND)
+        self.land_01 = Biome("#679459", LAND)
+        self.land_02 = Biome("#85A979", LAND)
+        self.land_03 = Biome("#9CB993", LAND)
+        self.land_04 = Biome("#BCCFB5", LAND)
+        self.shallow_water = Biome("#498DC9", WATER)
+        self.deep_water = Biome("#356894", WATER)
 
     def _fill_polys(self, poly_list, color="r", alpha=1, single=False):
         """Fills polygons on the pyplot graph"""
@@ -97,18 +106,21 @@ class MapGenerator:
         """Returns the distance between two points"""
         return np.sqrt((pt2[0] - pt1[0]) ** 2 + (pt2[1] - pt1[1]) ** 2)
 
-    def _get_closest_centroid(self, point, points):
+    def _get_closest_point(self, point, points):
         distances = [self._distance(point, i) for i in points]
         idx = distances.index(np.min(distances))
         return points[idx]
 
-    @timer
     def _get_neighbors(self, main_polygon):
         """Finds the adjacent polygons of a polygon"""
         x, y = main_polygon[0][0], main_polygon[0][1]
 
         d_t = 0.1  # Distance threshold
-        polygons_close = [i for i in self.polygons if x - d_t <= i[0][0] <= x + d_t and y - d_t <= i[0][1] <= y + d_t]
+        polygons_close = [
+            i
+            for i in self.polygons
+            if x - d_t <= i[0][0] <= x + d_t and y - d_t <= i[0][1] <= y + d_t
+        ]
 
         polygon_neighbors = []
         for point in main_polygon:
@@ -116,9 +128,8 @@ class MapGenerator:
                 if point in polygon:
                     polygon_neighbors.append(polygon)
 
-        # TODO: Remove duplicates in polygon_neighbors list
-        #   also try and speed this up.
-
+        # TODO: Fix duplicates, I think some still make it through
+        #   Look at add_rivers for an example
         try:
             polygon_neighbors.remove(main_polygon)
         except ValueError:
@@ -149,11 +160,11 @@ class MapGenerator:
     def _define_coastline(self):
         """Makes a "coastline" that consists of water polys that border land polys"""
         for idx, poly in enumerate(self.polygons):
-            if poly.biome.group == "land":
+            if poly.biome.group == LAND:
                 continue
             neighbors = self._get_neighbors(poly)
             for neighbor in neighbors:
-                if neighbor.biome.group == "land":
+                if neighbor.biome.group == LAND:
                     poly.coastline = True
                     self.polygons[idx] = poly
                     break
@@ -173,7 +184,7 @@ class MapGenerator:
 
         # Grabbing the first water polygon from the polygon list
         for poly in self.polygons:
-            if poly.biome.group == "water":
+            if poly.biome.group == WATER:
                 queue.append(poly)
                 break
 
@@ -201,13 +212,13 @@ class MapGenerator:
 
         self._define_coastline()
 
-        water_cents = [poly.centroid for poly in self.polygons if poly.biome.group == "water"]
+        water_cents = [poly.centroid for poly in self.polygons if poly.biome.group == WATER]
 
         distances = []
         for idx, poly in enumerate(self.polygons):
-            if poly.biome.group == "land":
+            if poly.biome.group == LAND:
                 centroid = poly.centroid
-                nearest_water = self._get_closest_centroid(centroid, water_cents)
+                nearest_water = self._get_closest_point(centroid, water_cents)
                 distance = self._distance(centroid, nearest_water)
                 distances.append((distance, idx))
 
@@ -216,6 +227,44 @@ class MapGenerator:
         for d, idx in distances:
             elevation = normalize(d, dist_max, dist_min)
             self.polygons[idx].elevation = elevation
+
+    @timer
+    def add_rivers(self, amt=5):
+        land_polys = [poly for poly in self.polygons if poly.biome.group == LAND]
+        sources = [np.random.choice(land_polys) for _ in range(amt)]
+
+        def get_river_path(poly, path=[]):
+            neighbors = sorted(self._get_neighbors(poly), key=lambda x: x.elevation)
+            lower_poly = neighbors[0]
+            if lower_poly.elevation < 0:  # Water
+                return path
+            if lower_poly in path:
+                lower_poly = neighbors[1]
+            path.append(lower_poly)
+            return get_river_path(lower_poly, path=path)
+
+        y = sorted(land_polys, key=lambda x: x.elevation, reverse=True)
+        path = get_river_path(y[0])
+
+        points = []
+        for poly in path:
+            for vert in poly:
+                points.append(vert)
+
+        start = points[0]
+        points = sorted(points, key=lambda x: self._distance(x, start))
+
+        # TODO: Make this different. It's totally useless because it
+        #   only searches the parent polygon.
+        def get_point_neighbor(point, poly_list):
+            poly = list(filter(lambda x: point in x, poly_list))[0]
+            idx = poly.index(point)
+            before = poly[idx - 1]
+            try:
+                after = poly[idx + 1]
+            except IndexError:
+                after = poly[0]
+            return [before, after]
 
     @timer
     def generate_map(self, size=75, freq=20, lloyds=2, sigma=3.15):
@@ -232,7 +281,9 @@ class MapGenerator:
         regions, vertices = voronoi_finite_polygons_2d(self.voronoi_diagram)
 
         polygons = sorted(clip(points, regions, vertices), key=lambda x: x[0][0])
-        polygons_stripped = [[vert for vert in poly if 0 <= vert[0] <= 1 and 0 <= vert[1] <= 1] for poly in polygons]
+        polygons_stripped = [
+            [vert for vert in poly if 0 <= vert[0] <= 1 and 0 <= vert[1] <= 1] for poly in polygons
+        ]
         self.polygons = [Polygon(i) for i in polygons_stripped]
 
         # Get noise, turn into 1D array
@@ -257,7 +308,7 @@ class MapGenerator:
         self._fill_polys(self.polygons, "black")
 
         for poly in self.polygons:
-            if poly.biome.group == "land":
+            if poly.biome.group == LAND:
                 if 0 <= poly.elevation < 0.18:  # Too many beaches. lowered threshold
                     poly.biome = self.land_beach
                 elif 0.18 <= poly.elevation < 0.4:
@@ -278,8 +329,9 @@ def main():
     full_frame(2, 2)
     generator = MapGenerator()
     generator.generate_map(size=50, freq=20, lloyds=2, sigma=3.15)
-    generator.add_deep_water()
+    # generator.add_deep_water()
     generator.add_elevation()
+    generator.add_rivers()
 
     generator.plot()
 
