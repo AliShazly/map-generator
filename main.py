@@ -230,32 +230,6 @@ class MapGenerator:
             height_avg = sum(poly_neighbor_height) / len(poly_neighbor_height)
             return height_avg
 
-        def get_vert_neighbors(vert):
-            poly_neighbors = [poly for poly in land_polys if vert in poly]
-
-            vert_neighbors = set()
-
-            for poly in poly_neighbors:
-                for vert in poly:
-                    vert_neighbors.add(tuple(vert))
-            
-            for v in list(vert_neighbors):
-                if self._distance(v, vert) <= 0.001:
-                    vert_neighbors.remove(v)
-                
-            return vert_neighbors
-            
-        points = []
-        for poly in land_polys:
-            for vert in poly:
-                points.append(vert)
-
-        # point_heights = [get_vert_height(vert) for vert in points]
-        self.x = points[1000]
-        self.y = get_vert_neighbors(self.x)
-
-
-
     @timer
     def generate_map(self, size=75, freq=20, lloyds=2, sigma=3.15):
         """Initializes the map and generates the base noise and voronoi diagram"""
@@ -310,17 +284,6 @@ class MapGenerator:
                 else:
                     poly.biome = self.land_04
             self._fill_polys(poly, poly.biome.color, single=True)
-
-        plt.plot(*self.x, marker='o', markersize=.8, color='red')
-        plt.savefig(path, dpi=300)
-        time.sleep(1)
-        
-        for v in self.y:
-            print(self._distance(v, self.x))
-            plt.plot(*v, marker='o', markersize=.8, color='blue')
-            plt.savefig(path, dpi=300)
-            time.sleep(.1)
-
 
         plt.savefig(path, dpi=300)
 
