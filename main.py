@@ -222,15 +222,6 @@ class MapGenerator:
             self.polygons[idx].elevation = elevation
 
     @timer
-    def add_rivers(self, amt=5):
-        land_polys = [poly for poly in self.polygons if poly.biome.group == LAND]
-
-        def get_vert_height(vert):
-            poly_neighbor_height = [poly.elevation for poly in land_polys if vert in poly]
-            height_avg = sum(poly_neighbor_height) / len(poly_neighbor_height)
-            return height_avg
-
-    @timer
     def generate_map(self, size=75, freq=20, lloyds=2, sigma=3.15):
         """Initializes the map and generates the base noise and voronoi diagram"""
         # make up data points
