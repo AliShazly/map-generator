@@ -56,9 +56,6 @@ class Polygon:
     def __repr__(self):
         return f"{self.__class__.__name__}({self.vertices}, {self.biome}, {self.coastline}, {self.elevation})"
 
-    def index(self, item):
-        return self.vertices.index(item)
-
     @property
     def centroid(self):
         x_vals = [i[0] for i in self.vertices]
@@ -116,11 +113,9 @@ class MapGenerator:
         x, y = main_polygon[0][0], main_polygon[0][1]
 
         d_t = 0.1  # Distance threshold
-        polygons_close = [
-            i
-            for i in self.polygons
-            if x - d_t <= i[0][0] <= x + d_t and y - d_t <= i[0][1] <= y + d_t
-        ]
+        polygons_close = [i for i in self.polygons 
+            if x - d_t <= i[0][0] <= x + d_t
+            and y - d_t <= i[0][1] <= y + d_t]
 
         polygon_neighbors = []
         for point in main_polygon:
@@ -128,8 +123,6 @@ class MapGenerator:
                 if point in polygon:
                     polygon_neighbors.append(polygon)
 
-        # TODO: Fix duplicates, I think some still make it through
-        #   Look at add_rivers for an example
         try:
             polygon_neighbors.remove(main_polygon)
         except ValueError:
@@ -231,40 +224,37 @@ class MapGenerator:
     @timer
     def add_rivers(self, amt=5):
         land_polys = [poly for poly in self.polygons if poly.biome.group == LAND]
-        sources = [np.random.choice(land_polys) for _ in range(amt)]
 
-        def get_river_path(poly, path=[]):
-            neighbors = sorted(self._get_neighbors(poly), key=lambda x: x.elevation)
-            lower_poly = neighbors[0]
-            if lower_poly.elevation < 0:  # Water
-                return path
-            if lower_poly in path:
-                lower_poly = neighbors[1]
-            path.append(lower_poly)
-            return get_river_path(lower_poly, path=path)
+        def get_vert_height(vert):
+            poly_neighbor_height = [poly.elevation for poly in land_polys if vert in poly]
+            height_avg = sum(poly_neighbor_height) / len(poly_neighbor_height)
+            return height_avg
 
-        y = sorted(land_polys, key=lambda x: x.elevation, reverse=True)
-        path = get_river_path(y[0])
+        def get_vert_neighbors(vert):
+            poly_neighbors = [poly for poly in land_polys if vert in poly]
 
+            vert_neighbors = set()
+
+            for poly in poly_neighbors:
+                for vert in poly:
+                    vert_neighbors.add(tuple(vert))
+            
+            for v in list(vert_neighbors):
+                if self._distance(v, vert) <= 0.001:
+                    vert_neighbors.remove(v)
+                
+            return vert_neighbors
+            
         points = []
-        for poly in path:
+        for poly in land_polys:
             for vert in poly:
                 points.append(vert)
 
-        start = points[0]
-        points = sorted(points, key=lambda x: self._distance(x, start))
+        # point_heights = [get_vert_height(vert) for vert in points]
+        self.x = points[1000]
+        self.y = get_vert_neighbors(self.x)
 
-        # TODO: Make this different. It's totally useless because it
-        #   only searches the parent polygon.
-        def get_point_neighbor(point, poly_list):
-            poly = list(filter(lambda x: point in x, poly_list))[0]
-            idx = poly.index(point)
-            before = poly[idx - 1]
-            try:
-                after = poly[idx + 1]
-            except IndexError:
-                after = poly[0]
-            return [before, after]
+
 
     @timer
     def generate_map(self, size=75, freq=20, lloyds=2, sigma=3.15):
@@ -321,6 +311,17 @@ class MapGenerator:
                     poly.biome = self.land_04
             self._fill_polys(poly, poly.biome.color, single=True)
 
+        plt.plot(*self.x, marker='o', markersize=.8, color='red')
+        plt.savefig(path, dpi=300)
+        time.sleep(1)
+        
+        for v in self.y:
+            print(self._distance(v, self.x))
+            plt.plot(*v, marker='o', markersize=.8, color='blue')
+            plt.savefig(path, dpi=300)
+            time.sleep(.1)
+
+
         plt.savefig(path, dpi=300)
 
 
@@ -329,7 +330,7 @@ def main():
     full_frame(2, 2)
     generator = MapGenerator()
     generator.generate_map(size=50, freq=20, lloyds=2, sigma=3.15)
-    # generator.add_deep_water()
+    generator.add_deep_water()
     generator.add_elevation()
     generator.add_rivers()
 
