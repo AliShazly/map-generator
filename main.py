@@ -1,3 +1,4 @@
+import argparse
 import numpy as np
 import time
 from functools import wraps
@@ -205,7 +206,9 @@ class MapGenerator:
 
         self._define_coastline()
 
-        water_cents = [poly.centroid for poly in self.polygons if poly.biome.group == WATER]
+        water_cents = [
+            poly.centroid for poly in self.polygons if poly.biome.group == WATER
+        ]
 
         distances = []
         for idx, poly in enumerate(self.polygons):
@@ -237,7 +240,8 @@ class MapGenerator:
 
         polygons = sorted(clip(points, regions, vertices), key=lambda x: x[0][0])
         polygons_stripped = [
-            [vert for vert in poly if 0 <= vert[0] <= 1 and 0 <= vert[1] <= 1] for poly in polygons
+            [vert for vert in poly if 0 <= vert[0] <= 1 and 0 <= vert[1] <= 1]
+            for poly in polygons
         ]
         self.polygons = [Polygon(i) for i in polygons_stripped]
 
@@ -252,7 +256,7 @@ class MapGenerator:
         self._generate_base_terrain(noise_arr)
 
     @timer
-    def plot(self, path="images/voro.png"):
+    def plot(self, path="./voro.png"):
         """Plots and colors the voronoi map"""
 
         def rgb2hex(rgb):
@@ -281,14 +285,53 @@ class MapGenerator:
 
 @timer
 def main():
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument(
+        "-s",
+        "--save",
+        type=str,
+        default="./voro.png",
+        help="Directory to save image to",
+    )
+    parser.add_argument(
+        "--size",
+        type=int,
+        default=60,
+        help="Size of voronoi diagram. Impacts generation speed greatly",
+    )
+    parser.add_argument(
+        "-f",
+        "--frequency",
+        type=int,
+        default=20,
+        help="Frequency of perlin noise, lower is more frequent",
+    )
+    parser.add_argument(
+        "-r",
+        "--relaxation",
+        type=int,
+        default=2,
+        help="Iterations of the lloyd's relaxation",
+    )
+    parser.add_argument(
+        "-g",
+        "--gradient",
+        type=int,
+        default=3.15,
+        help="Strength of the gaussian gradient. Higher makes the ocean larger",
+    )
+
+    args = parser.parse_args()
+
     full_frame(2, 2)
     generator = MapGenerator()
-    generator.generate_map(size=50, freq=20, lloyds=2, sigma=3.15)
+    generator.generate_map(
+        size=args.size, freq=args.frequency, lloyds=args.relaxation, sigma=args.gradient
+    )
     generator.add_deep_water()
     generator.add_elevation()
-    generator.add_rivers()
-
-    generator.plot()
+    generator.plot(path=args.save)
 
 
 if __name__ == "__main__":
