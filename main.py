@@ -1,5 +1,6 @@
 import argparse
 import numpy as np
+from PIL import Image
 import time
 from functools import wraps
 import matplotlib.pyplot as plt
@@ -114,9 +115,11 @@ class MapGenerator:
         x, y = main_polygon[0][0], main_polygon[0][1]
 
         d_t = 0.1  # Distance threshold
-        polygons_close = [i for i in self.polygons 
-            if x - d_t <= i[0][0] <= x + d_t
-            and y - d_t <= i[0][1] <= y + d_t]
+        polygons_close = [  # I'm tired of reformatting this. Black wins this time...
+            i
+            for i in self.polygons
+            if x - d_t <= i[0][0] <= x + d_t and y - d_t <= i[0][1] <= y + d_t
+        ]
 
         polygon_neighbors = []
         for point in main_polygon:
@@ -206,9 +209,7 @@ class MapGenerator:
 
         self._define_coastline()
 
-        water_cents = [
-            poly.centroid for poly in self.polygons if poly.biome.group == WATER
-        ]
+        water_cents = [poly.centroid for poly in self.polygons if poly.biome.group == WATER]
 
         distances = []
         for idx, poly in enumerate(self.polygons):
@@ -225,13 +226,15 @@ class MapGenerator:
             self.polygons[idx].elevation = elevation
 
     @timer
-    def generate_map(self, size=75, freq=20, lloyds=2, sigma=3.15):
+    def generate_map(self, size=75, freq=20, lloyds=2, sigma=3.15, seed=None):
         """Initializes the map and generates the base noise and voronoi diagram"""
         # make up data points
         size_sqrt = size
         size = size ** 2
 
         # compute Voronoi tesselation
+        if seed is not None:
+            np.random.seed(seed)
         points = np.random.random((size, 2))
         vor = VoronoiDiagram(points)
         vor.generate_voronoi()
@@ -240,13 +243,12 @@ class MapGenerator:
 
         polygons = sorted(clip(points, regions, vertices), key=lambda x: x[0][0])
         polygons_stripped = [
-            [vert for vert in poly if 0 <= vert[0] <= 1 and 0 <= vert[1] <= 1]
-            for poly in polygons
+            [vert for vert in poly if 0 <= vert[0] <= 1 and 0 <= vert[1] <= 1] for poly in polygons
         ]
         self.polygons = [Polygon(i) for i in polygons_stripped]
 
         # Get noise, turn into 1D array
-        noise = Perlin(freq)
+        noise = Perlin(freq, shuffle_seed=seed)
         noise_img = noise.create_image(save=True, width=200, height=200)
         noise_gauss = noise.gaussian_kernel(noise_img, nsig=sigma)
         noise_gauss.save("images/noise.png")
@@ -288,11 +290,7 @@ def main():
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
-        "-s",
-        "--save",
-        type=str,
-        default="./voro.png",
-        help="Directory to save image to",
+        "-s", "--save", type=str, default="./voro.png", help="Directory to save image to"
     )
     parser.add_argument(
         "--size",
@@ -300,6 +298,7 @@ def main():
         default=60,
         help="Size of voronoi diagram. Impacts generation speed greatly",
     )
+    parser.add_argument("--seed", type=int, default=None, help="Seed for map generation")
     parser.add_argument(
         "-f",
         "--frequency",
@@ -308,11 +307,7 @@ def main():
         help="Frequency of perlin noise, lower is more frequent",
     )
     parser.add_argument(
-        "-r",
-        "--relaxation",
-        type=int,
-        default=2,
-        help="Iterations of the lloyd's relaxation",
+        "-r", "--relaxation", type=int, default=2, help="Iterations of the lloyd's relaxation"
     )
     parser.add_argument(
         "-g",
@@ -327,7 +322,11 @@ def main():
     full_frame(2, 2)
     generator = MapGenerator()
     generator.generate_map(
-        size=args.size, freq=args.frequency, lloyds=args.relaxation, sigma=args.gradient
+        size=args.size,
+        freq=args.frequency,
+        lloyds=args.relaxation,
+        sigma=args.gradient,
+        seed=args.seed,
     )
     generator.add_deep_water()
     generator.add_elevation()
