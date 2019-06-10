@@ -91,7 +91,7 @@ class Perlin:
             img.save(out_path)
         return img
 
-    def gaussian_kernel(self, image, nsig=3.5):
+    def gaussian_kernel(self, image, nsig=3.15):
         """Multiplies the image by a gaussian kernel"""
 
         def scale(x, out_range=(0, 1)):
@@ -120,8 +120,11 @@ class Perlin:
 
 def main():
     freq = 25  # Freq, smaller is more dense
-    noise = Perlin(freq)
-    img = noise.create_image(width=200, height=200, save=True)
+    noise = Perlin(freq, shuffle_seed=124)
+    img = noise.create_image(width=700, height=700, save=True)
+    img.save("images/raw_noise.png")
+    kernel = noise.gaussian_kernel(img)
+    kernel.save("images/noise_gauss.png")
 
 
 if __name__ == "__main__":

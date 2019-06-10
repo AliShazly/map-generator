@@ -278,11 +278,13 @@ class MapGenerator:
                     poly.biome = self.land_02
                 elif 0.6 <= poly.elevation < 0.8:
                     poly.biome = self.land_03
-                else:
+                elif 0.8 <= poly.elevation <= 1:
                     poly.biome = self.land_04
+                else:
+                    poly.biome = self.land_01
             self._fill_polys(poly, poly.biome.color, single=True)
 
-        plt.savefig(path, dpi=300)
+        plt.savefig(path, dpi=350)
 
 
 @timer
